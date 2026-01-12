@@ -8,4 +8,6 @@ logs/
 *.word
 *.html
 *.txt
+*.pkl
+*/faiss
 
