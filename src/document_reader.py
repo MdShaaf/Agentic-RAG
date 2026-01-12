@@ -40,6 +40,21 @@ import json
 
 FINGERPRINT_FILE = "folder_fingerprint.json"
 
+def enrich_metadata(docs, file_path: Path, file_type: str):
+    """
+    Add consistent metadata to LangChain Documents
+    """
+    for i, doc in enumerate(docs):
+        doc.metadata.update({
+            "source": file_path.name,
+            "path": str(file_path),
+            "file_type": file_type,
+            "doc_id": hashlib.sha1(
+                f"{file_path}_{i}".encode()
+            ).hexdigest()
+        })
+    return docs
+
 def load_old_fingerprint():
     if os.path.exists(FINGERPRINT_FILE):
         with open(FINGERPRINT_FILE, "r") as f:
@@ -77,6 +92,7 @@ def load_all_documents(path):
             try:
                 loader = PyPDFLoader(str(pdf))
                 docs = loader.load()
+                enrich_metadata(docs, pdf, "pdf")
                 documents.extend(docs)
             except Exception as e:
                 logger.error(f"Failed to load PDF {pdf}: {e}")
@@ -88,6 +104,7 @@ def load_all_documents(path):
             try:
                 loader = TextLoader(str(txt_file))
                 loaded = loader.load()
+                enrich_metadata(loaded, txt_file, "txt")
                 documents.extend(loaded)
             except Exception as e:
                 logger.error(f"Failed to load TXT {txt_file}: {e}")
@@ -99,6 +116,7 @@ def load_all_documents(path):
             try:
                 loader = UnstructuredWordDocumentLoader(str(docx_file))
                 docs = loader.load()
+                enrich_metadata(docs, docx_file, "docx")
                 documents.extend(docs)
             except Exception as e:
                 logger.error(f"Failed to load DOCX {docx_file}: {e}")
@@ -110,6 +128,7 @@ def load_all_documents(path):
             try:
                 loader = UnstructuredCSVLoader(str(csv_file))
                 docs = loader.load()
+                enrich_metadata(docs, csv_file, "csv")
                 documents.extend(docs)
             except Exception as e:
                 logger.error(f"Failed to load CSV {csv_file}: {e}")
@@ -140,3 +159,4 @@ if __name__ == "__main__":
     path = Path(r"C:\Users\Shaaf\Desktop\Data Science\Practice Projects\PDF_Video Reader\PDF_Samples")
     documents = load_all_documents(path)
     print(f"Demo: Loaded {len(documents)} documents")
+    # print(documents[1].metadata)

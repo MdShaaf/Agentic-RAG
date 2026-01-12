@@ -95,3 +95,4 @@ Output ONLY the rewritten query, nothing else:"""
     # Max attempts reached
     logger.warning(f"❌ Max attempts ({MAX_ATTEMPTS}) reached without complete answer")
     return f"I searched through the documents {MAX_ATTEMPTS} times but couldn't find enough information to fully answer: '{question}'. Here's what I found:\n\n{state['context'][:1000]}"
+
