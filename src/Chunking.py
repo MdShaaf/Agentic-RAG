@@ -26,3 +26,6 @@ def chunk_documents(documents, chunk_size=1000, chunk_overlap=200):
             chunked_docs.append(chunk)
 
     return chunked_docs
+
+if __name__== "__main__":
+    main()

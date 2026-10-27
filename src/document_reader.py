@@ -7,9 +7,13 @@ warnings.filterwarnings('ignore')
 from pathlib import Path
 from tqdm import tqdm
 import logging
+import json
 
 print("document_reader.py is being executed!")
-
+BASE_DIR = Path(__file__).resolve().parent.parent
+CACHE_DIR = BASE_DIR/"Cache"
+CACHE_DIR.mkdir(exist_ok=True)
+DOC_CACHE_FILE = CACHE_DIR/"cached_documents.pkl"
 ##Logger settings
 logging.basicConfig(
     level=logging.INFO,
@@ -36,11 +40,10 @@ def folder_fingerprint(folder_path):
     return hasher.hexdigest()
 
 
-import json
 
-FINGERPRINT_FILE = "folder_fingerprint.json"
+FINGERPRINT_FILE = CACHE_DIR/"folder_fingerprint.json"
 
-def enrich_metadata(docs, file_path: Path, file_type: str):
+def enrich_metadata(docs, file_path, file_type):
     """
     Add consistent metadata to LangChain Documents
     """
@@ -71,22 +74,22 @@ def load_all_documents(path):
     Load all documents from the given path with caching support.
     Checks if folder contents changed and uses cache if unchanged.
     """
-    print("load_all_documents function is being called!")
     
-    DOC_CACHE_FILE = "cached_documents.pkl"
+  
     
-    # Check if folder contents changed
-    new_folder_fingerprint = folder_fingerprint(path)
-    old_folder_fingerprint = load_old_fingerprint()
+    # # Check if folder contents changed
+    # new_folder_fingerprint = folder_fingerprint(BASE_DIR/"PDF_Samples")
+    # old_folder_fingerprint = load_old_fingerprint()
     
-    if new_folder_fingerprint != old_folder_fingerprint or not os.path.exists(DOC_CACHE_FILE):
-        logger.info("Folder contents changed. Reloading documents...")
+    # if new_folder_fingerprint != old_folder_fingerprint or not os.path.exists(DOC_CACHE_FILE):
+    #     logger.info("Folder contents changed. Reloading documents...")
         
         # Load all documents
-        documents = []
-        
-        # Load PDFs
-        pdf_files = list(path.rglob("**.pdf"))
+    documents = []
+    
+    # Load PDFs
+    pdf_files = list(path.rglob("**.pdf"))
+    if pdf_files:
         logger.info(f"Found {len(pdf_files)} PDF files.")
         for pdf in tqdm(pdf_files, desc="Loading PDF files"):
             try:
@@ -96,9 +99,12 @@ def load_all_documents(path):
                 documents.extend(docs)
             except Exception as e:
                 logger.error(f"Failed to load PDF {pdf}: {e}")
+    else:
+        logger.info("No PDF files found.")
 
-        # Load TXT files
-        txt_files = list(path.rglob("**.txt"))
+    # Load TXT files
+    txt_files = list(path.rglob("**.txt"))
+    if txt_files:
         logger.info(f"Found {len(txt_files)} TXT files.")
         for txt_file in tqdm(txt_files, desc="Loading TXT files"):
             try:
@@ -108,9 +114,12 @@ def load_all_documents(path):
                 documents.extend(loaded)
             except Exception as e:
                 logger.error(f"Failed to load TXT {txt_file}: {e}")
+    else:
+        logger.info("No TXT files found.")
 
-        # Load DOCX files
-        docx_files = list(path.rglob("**.docx"))
+    # Load DOCX files
+    docx_files = list(path.rglob("**.docx"))
+    if docx_files:
         logger.info(f"Found {len(docx_files)} DOCX files")
         for docx_file in tqdm(docx_files, desc="Loading DOCX files"):
             try:
@@ -120,9 +129,12 @@ def load_all_documents(path):
                 documents.extend(docs)
             except Exception as e:
                 logger.error(f"Failed to load DOCX {docx_file}: {e}")
+    else:
+        logger.info("No DOCX files found.")
 
-        # Load CSV files
-        csv_files = list(path.rglob("**.csv"))
+    # Load CSV files
+    csv_files = list(path.rglob("**.csv"))
+    if csv_files:
         logger.info(f"Found {len(csv_files)} CSV files")
         for csv_file in tqdm(csv_files, desc="Loading CSV files"):
             try:
@@ -132,31 +144,26 @@ def load_all_documents(path):
                 documents.extend(docs)
             except Exception as e:
                 logger.error(f"Failed to load CSV {csv_file}: {e}")
-        
-        logger.info(f"Total documents loaded: {len(documents)}")
-        
-        # Save to cache
-        logger.info("Saving documents to cache...")
-        with open(DOC_CACHE_FILE, "wb") as f:
-            pickle.dump(documents, f)
-        
-        save_fingerprint(new_folder_fingerprint)
-        
     else:
-        # Load from cache
-        logger.info("Folder contents unchanged. Loading documents from cache...")
-        with open(DOC_CACHE_FILE, "rb") as f:
-            documents = pickle.load(f)
-        
-        logger.info(f"Total documents loaded: {len(documents)}")
+        logger.info("No CSV files found.")
     
+    logger.info(f"Total documents loaded: {len(documents)}")
+    
+    # Save to cache
+    logger.info("Saving documents to cache...")
+    with open(DOC_CACHE_FILE, "wb") as f:
+        pickle.dump(documents, f)
+    
+    
+    # logger.info(f"Total documents loaded: {len(documents)}")
+
     return documents
 
 
-# ✅ Only run this code when the script is executed directly
+#✅ Only run this code when the script is executed directly
 if __name__ == "__main__":
-    # For testing/demo purposes
-    path = Path(r"C:\Users\Shaaf\Desktop\Data Science\Practice Projects\PDF_Video Reader\PDF_Samples")
-    documents = load_all_documents(path)
+    files_path = BASE_DIR / "PDF_Samples"
+    documents = load_all_documents(files_path)
     print(f"Demo: Loaded {len(documents)} documents")
     # print(documents[1].metadata)
+    print(BASE_DIR)
