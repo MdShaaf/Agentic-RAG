@@ -3,18 +3,20 @@ from langchain_community.llms import Ollama
 
 logger = logging.getLogger(__name__)
 
-llm = Ollama(
-    model="llama3.2:1b",
-    temperature=0.5
+DEFAULT_INSTRUCTIONS = (
+    "Answer the question using only the provided context. "
+    "If the context does not contain the answer, say so."
 )
 
 
-def run_rag_agent(question: str, context: str) -> str:
+def run_rag_agent(question: str, context: str,temperature: float = 0.1,instructions: str = DEFAULT_INSTRUCTIONS) -> str:
     """Generate an answer using the provided question and context."""
 
-    prompt = f"""
-    Answer the question using only the provided context.
-    If the context does not contain the answer, say so.
+    llm = Ollama(
+        model="llama3.2:1b",
+        temperature=temperature)
+
+    prompt = f"""{instructions.strip() or DEFAULT_INSTRUCTIONS}
 
     Context:
     {context}

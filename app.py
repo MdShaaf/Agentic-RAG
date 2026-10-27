@@ -8,6 +8,8 @@ from src.document_reader import load_all_documents
 from src.Chunking import chunk_documents
 from src.Embedding import build_or_load_faiss
 from src.Agentic_RAG import run_rag_agent
+from src.similarity_reranker import similarity_reranker
+from src.Agentic_RAG import DEFAULT_INSTRUCTIONS
 
 # ---------- Page config ----------
 st.set_page_config(
@@ -24,7 +26,10 @@ defaults = {
     "num_files": 0,
     "num_chunks": 0,
     "file_names": [],
+    "instructions": DEFAULT_INSTRUCTIONS,
+
 }
+
 for key, value in defaults.items():
     if key not in st.session_state:
         st.session_state[key] = value
@@ -70,14 +75,30 @@ with st.sidebar:
             else:
                 status.update(label="No readable text found", state="error")
 
-    st.divider()
-    st.subheader("🔧 Retrieval Settings")
-    top_k = st.slider("Chunks to retrieve (k)", min_value=1, max_value=10, value=4)
+
 
     st.divider()
     if st.button("🗑️ Clear chat", use_container_width=True):
         st.session_state.messages = []
         st.rerun()
+
+        st.divider()
+    with st.expander("⚙️ Advanced"):
+        temperature = st.slider(
+            "Temperature", 0.0, 1.0, 0.1, 0.05,
+            help="Lower = more factual and consistent. Higher = more varied wording.",
+        )
+        st.text_area(
+            "Answer instructions",
+            key="instructions",
+            height=120,
+            help="Tells the model how to answer. The retrieved context and your question are added automatically.",
+        )
+        if st.button("Reset instructions", use_container_width=True):
+            st.session_state.instructions = DEFAULT_INSTRUCTIONS
+            st.rerun()
+
+    st.divider()
 
     with st.expander("ℹ️ About"):
         st.caption(
@@ -105,6 +126,17 @@ with st.expander("📄 Loaded files"):
         st.write(f"• {name}")
 
 st.divider()
+search_strategy = st.radio("Search strategy", ["Semantic Search", "Keyword Search", "Hybrid Search"], horizontal=True)
+if search_strategy == "Semantic Search":
+    st.caption(f"Selected: Semantic Search")
+    st.caption("Finds relevant content based on the meaning and context of your question, even when exact words differ.")
+elif search_strategy == "Keyword Search":
+    st.caption(f"Selected: Keyword Search")
+    st.caption("Finds content containing matching words or exact terms, useful for technical codes, IDs, and specific keywords.")
+else:
+    st.caption(f"Selected: Hybrid Search")
+    st.caption("Combines semantic and keyword search to find content using both meaning, context and exact terms like codes, IDs, and specific keywords.")
+st.divider()
 
 # Chat history
 for msg in st.session_state.messages:
@@ -124,14 +156,15 @@ if question := st.chat_input("Ask a question about your PDFs..."):
 
     with st.chat_message("assistant"):
         with st.spinner("Retrieving context and generating answer..."):
-            results = st.session_state.vectorstore.similarity_search(question, k=top_k)
-            context = "\n\n".join(doc.page_content for doc in results)
-            answer = run_rag_agent(question, context)
+            results = similarity_reranker(st.session_state.vectorstore.docstore._dict.values(), st.session_state.vectorstore, question, search_strategy)
+            st.spinner("Reranked results retrieved. Generating answer...")
+            context = "\n\n".join(doc.page_content for doc, score in results)
+            answer = run_rag_agent(question, context,temperature=temperature,instructions=st.session_state.instructions)
 
         st.markdown(answer)
 
         sources = []
-        for doc in results:
+        for i, (doc, score) in enumerate(results, 1):
             meta = doc.metadata or {}
             label = " · ".join(
                 str(x) for x in [
@@ -139,7 +172,7 @@ if question := st.chat_input("Ask a question about your PDFs..."):
                     f"page {meta['page'] + 1}" if isinstance(meta.get("page"), int) else None,
                 ] if x
             )
-            sources.append({"meta": label, "text": doc.page_content})
+            sources.append({"meta": label, "text": doc.page_content, "score": float(score)})
 
         with st.expander(f"📎 Sources ({len(sources)})"):
             for i, src in enumerate(sources, 1):
