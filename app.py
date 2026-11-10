@@ -1,7 +1,7 @@
 # new ui
 import tempfile
 from pathlib import Path
-
+import time
 import streamlit as st
 
 from src.document_reader import load_all_documents
@@ -156,10 +156,13 @@ if question := st.chat_input("Ask a question about your PDFs..."):
 
     with st.chat_message("assistant"):
         with st.spinner("Retrieving context and generating answer..."):
+            t0 = time.perf_counter()
             results = similarity_reranker(st.session_state.vectorstore.docstore._dict.values(), st.session_state.vectorstore, question, search_strategy)
-            st.spinner("Reranked results retrieved. Generating answer...")
+            t1 = time.perf_counter()
             context = "\n\n".join(doc.page_content for doc, score in results)
-            answer = run_rag_agent(question, context,temperature=temperature,instructions=st.session_state.instructions)
+            answer = run_rag_agent(question, context, temperature=temperature, instructions=st.session_state.instructions)
+            t2 = time.perf_counter()
+            st.caption(f"Retrieval + rerank: {t1 - t0:.1f}s · LLM: {t2 - t1:.1f}s")
 
         st.markdown(answer)
 
